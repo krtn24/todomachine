@@ -6,29 +6,11 @@
 <title>タスク管理くん</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.2/dist/tailwind.min.css" rel="stylesheet" />
-<style>
-  /* 名言表示エリアのデザイン */
-  #quote {
-    font-style: italic;
-    font-size: 1.25rem;
-    margin-bottom: 1rem;
-    text-align: center;
-    color: #2563eb;
-  }
-</style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4">
 
 <div class="max-w-4xl mx-auto bg-white rounded shadow p-6">
   <h1 class="text-3xl font-bold mb-6 text-center">タスク管理くん</h1>
-
-  <!-- モチベーションコラム -->
-  <section id="motivation" class="mb-6">
-    <div id="quote">読み込み中...</div>
-    <button id="newQuoteBtn" class="block mx-auto bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
-      名言を変える
-    </button>
-  </section>
 
   <!-- 目標設定 -->
   <section class="mb-8">
@@ -82,31 +64,12 @@
   const taskDeadline = document.getElementById('taskDeadline');
   const taskEstTime = document.getElementById('taskEstTime');
 
-  // 名言リスト（例）
-  const quotes = [
-    "成功の秘訣は、準備と機会が出会うところにある。 - ボビー・アンサー",
-    "小さなことを重ねることが、とんでもないところに行くただ一つの道だ。 - イチロー",
-    "努力は必ず報われる。もし報われない努力があるのならば、それはまだ努力と呼べない。 - 王貞治",
-    "夢を見ることができれば、それを実現することもできる。 - ウォルト・ディズニー",
-    "失敗は成功のもと。何度でも立ち上がろう。 - トーマス・エジソン"
-  ];
-
-  // 名言表示更新
-  const quoteElem = document.getElementById('quote');
-  const newQuoteBtn = document.getElementById('newQuoteBtn');
-  function showRandomQuote() {
-    const idx = Math.floor(Math.random() * quotes.length);
-    quoteElem.textContent = quotes[idx];
-  }
-  newQuoteBtn.onclick = showRandomQuote;
-
   goalForm.addEventListener('submit', e => {
     e.preventDefault();
     goals.push({
       id: Date.now(),
       title: goalTitle.value.trim(),
-      deadline: goalDeadline.value,
-      achievedPercent: 0
+      deadline: goalDeadline.value
     });
     saveGoals();
     renderGoals();
@@ -125,7 +88,6 @@
     });
     saveTasks();
     renderTasks();
-    updateGoalAchievedPercent(); // 達成度計算
     taskForm.reset();
   });
 
@@ -140,10 +102,10 @@
     goalList.innerHTML = '';
     goals.forEach(g => {
       const li = document.createElement('li');
-      li.className = 'border rounded p-2 flex flex-col sm:flex-row justify-between items-center bg-gray-50 gap-2';
+      li.className = 'border rounded p-2 bg-gray-50 flex justify-between items-center';
 
       const info = document.createElement('div');
-      info.innerHTML = `<strong>${g.title}</strong> 期限: ${g.deadline} 達成度: ${g.achievedPercent.toFixed(1)}%`;
+      info.textContent = `${g.title} 期限: ${g.deadline}`;
 
       const delBtn = document.createElement('button');
       delBtn.textContent = '削除';
@@ -193,7 +155,6 @@
         tasks = tasks.filter(task => task.id !== t.id);
         saveTasks();
         renderTasks();
-        updateGoalAchievedPercent();
         updateChart();
       };
 
@@ -207,7 +168,6 @@
     tasks = tasks.map(t => (t.id === id ? { ...t, done: !t.done } : t));
     saveTasks();
     renderTasks();
-    updateGoalAchievedPercent();
     updateChart();
   };
 
@@ -215,28 +175,9 @@
     tasks = tasks.map(t => (t.id === id ? { ...t, studyTime: time } : t));
     saveTasks();
     renderTasks();
-    updateGoalAchievedPercent();
     updateChart();
   }
 
-  // 達成度自動計算：目標タイトルと部分一致するタスクの完了率（完了タスク数/全タスク数*100）を計算
-  function updateGoalAchievedPercent() {
-    goals = goals.map(goal => {
-      const relatedTasks = tasks.filter(t =>
-        t.title.includes(goal.title)
-      );
-      if (relatedTasks.length === 0) {
-        return { ...goal, achievedPercent: 0 };
-      }
-      const doneCount = relatedTasks.filter(t => t.done).length;
-      const percent = (doneCount / relatedTasks.length) * 100;
-      return { ...goal, achievedPercent: percent };
-    });
-    saveGoals();
-    renderGoals();
-  }
-
-  // 週の日付（日曜〜土曜）を取得
   function getWeekDates(date) {
     const day = date.getDay();
     const sunday = new Date(date);
@@ -296,12 +237,10 @@
     studyChart.update();
   }
 
-  // 初期表示
-  showRandomQuote();
   renderGoals();
   renderTasks();
-  updateGoalAchievedPercent();
   updateChart();
+
 </script>
 
 </body>
