@@ -2,60 +2,231 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>簡単Todoリスト</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; }
-  ul { list-style: none; padding-left: 0; }
-  li { margin-bottom: 5px; }
-  .done { text-decoration: line-through; color: gray; }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>資格勉強QOL管理</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.2/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body>
-<h1>勉強タスク管理</h1>
+<body class="bg-gray-50 min-h-screen p-4">
 
-<input id="taskInput" placeholder="タスクを入力" />
-<button onclick="addTask()">追加</button>
+<div class="max-w-4xl mx-auto bg-white rounded shadow p-6">
+  <h1 class="text-3xl font-bold mb-6 text-center">資格勉強QOL管理</h1>
 
-<ul id="taskList"></ul>
+  <!-- 目標設定 -->
+  <section class="mb-8">
+    <h2 class="text-xl font-semibold mb-3">目標設定</h2>
+    <form id="goalForm" class="flex flex-col sm:flex-row gap-3 items-center">
+      <input type="text" id="goalTitle" placeholder="目標タイトル" required
+        class="border rounded p-2 flex-grow" />
+      <input type="date" id="goalDeadline" required class="border rounded p-2" />
+      <button type="submit"
+        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">追加</button>
+    </form>
+    <ul id="goalList" class="mt-4 space-y-2"></ul>
+  </section>
+
+  <!-- タスク管理 -->
+  <section class="mb-8">
+    <h2 class="text-xl font-semibold mb-3">勉強タスク管理</h2>
+    <form id="taskForm" class="flex flex-col sm:flex-row gap-3 items-center">
+      <input type="text" id="taskTitle" placeholder="タスク名" required class="border rounded p-2 flex-grow" />
+      <input type="date" id="taskDeadline" required class="border rounded p-2" />
+      <input type="number" id="taskEstTime" placeholder="予定時間(分)" min="1" class="border rounded p-2 w-32" />
+      <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+        追加
+      </button>
+    </form>
+    <ul id="taskList" class="mt-4 space-y-2"></ul>
+  </section>
+
+  <!-- グラフ表示 -->
+  <section>
+    <h2 class="text-xl font-semibold mb-3">勉強時間の推移</h2>
+    <canvas id="studyChart" class="w-full max-w-3xl mx-auto"></canvas>
+  </section>
+</div>
 
 <script>
-const taskList = document.getElementById('taskList');
-const taskInput = document.getElementById('taskInput');
+  // ローカルストレージキー
+  const GOAL_KEY = 'qol_goals';
+  const TASK_KEY = 'qol_tasks';
 
-// ローカルストレージから読み込み
-let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+  // 状態保持
+  let goals = JSON.parse(localStorage.getItem(GOAL_KEY) || '[]');
+  let tasks = JSON.parse(localStorage.getItem(TASK_KEY) || '[]');
 
-function saveTasks() {
-  localStorage.setItem('tasks', JSON.stringify(tasks));
-}
+  // 要素取得
+  const goalForm = document.getElementById('goalForm');
+  const goalList = document.getElementById('goalList');
+  const goalTitle = document.getElementById('goalTitle');
+  const goalDeadline = document.getElementById('goalDeadline');
 
-function renderTasks() {
-  taskList.innerHTML = '';
-  tasks.forEach((task, index) => {
-    const li = document.createElement('li');
-    li.className = task.done ? 'done' : '';
-    li.textContent = task.text;
-    li.onclick = () => toggleDone(index);
-    taskList.appendChild(li);
+  const taskForm = document.getElementById('taskForm');
+  const taskList = document.getElementById('taskList');
+  const taskTitle = document.getElementById('taskTitle');
+  const taskDeadline = document.getElementById('taskDeadline');
+  const taskEstTime = document.getElementById('taskEstTime');
+
+  // 目標追加
+  goalForm.addEventListener('submit', e => {
+    e.preventDefault();
+    goals.push({
+      id: Date.now(),
+      title: goalTitle.value.trim(),
+      deadline: goalDeadline.value,
+      achievedPercent: 0
+    });
+    saveGoals();
+    renderGoals();
+    goalForm.reset();
   });
-}
 
-function addTask() {
-  const text = taskInput.value.trim();
-  if (!text) return alert('タスクを入力してください');
-  tasks.push({ text, done: false });
-  taskInput.value = '';
-  saveTasks();
+  // タスク追加
+  taskForm.addEventListener('submit', e => {
+    e.preventDefault();
+    tasks.push({
+      id: Date.now(),
+      title: taskTitle.value.trim(),
+      deadline: taskDeadline.value,
+      estTime: Number(taskEstTime.value) || 0,
+      done: false,
+      studyTime: 0 // 実績時間（分）
+    });
+    saveTasks();
+    renderTasks();
+    taskForm.reset();
+  });
+
+  // 保存
+  function saveGoals() {
+    localStorage.setItem(GOAL_KEY, JSON.stringify(goals));
+  }
+  function saveTasks() {
+    localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
+  }
+
+  // 目標リスト描画
+  function renderGoals() {
+    goalList.innerHTML = '';
+    goals.forEach(g => {
+      const li = document.createElement('li');
+      li.className = 'border rounded p-2 flex justify-between items-center bg-gray-50';
+
+      const info = document.createElement('div');
+      info.innerHTML = `<strong>${g.title}</strong> 期限: ${g.deadline} 達成度: ${g.achievedPercent}%`;
+
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '削除';
+      delBtn.className = 'text-red-600 hover:underline';
+      delBtn.onclick = () => {
+        goals = goals.filter(goal => goal.id !== g.id);
+        saveGoals();
+        renderGoals();
+      };
+
+      li.appendChild(info);
+      li.appendChild(delBtn);
+      goalList.appendChild(li);
+    });
+  }
+
+  // タスクリスト描画
+  function renderTasks() {
+    taskList.innerHTML = '';
+    tasks.forEach(t => {
+      const li = document.createElement('li');
+      li.className =
+        'border rounded p-2 flex justify-between items-center ' + (t.done ? 'bg-green-100 line-through text-gray-600' : 'bg-white');
+
+      const leftDiv = document.createElement('div');
+      leftDiv.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleDone(${t.id})" class="mr-2" />` +
+        `<strong>${t.title}</strong> 期限: ${t.deadline} 予定時間: ${t.estTime}分 実績時間: ${t.studyTime}分`;
+
+      // 勉強時間入力フォーム
+      const studyTimeInput = document.createElement('input');
+      studyTimeInput.type = 'number';
+      studyTimeInput.min = 0;
+      studyTimeInput.value = t.studyTime;
+      studyTimeInput.className = 'w-20 border rounded p-1 ml-4';
+      studyTimeInput.onchange = e => {
+        const time = Number(e.target.value);
+        if (time >= 0) {
+          updateStudyTime(t.id, time);
+        }
+      };
+
+      leftDiv.appendChild(studyTimeInput);
+
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '削除';
+      delBtn.className = 'text-red-600 hover:underline ml-4';
+      delBtn.onclick = () => {
+        tasks = tasks.filter(task => task.id !== t.id);
+        saveTasks();
+        renderTasks();
+        updateChart();
+      };
+
+      li.appendChild(leftDiv);
+      li.appendChild(delBtn);
+      taskList.appendChild(li);
+    });
+  }
+
+  // 完了チェック切り替え
+  window.toggleDone = function (id) {
+    tasks = tasks.map(t => (t.id === id ? { ...t, done: !t.done } : t));
+    saveTasks();
+    renderTasks();
+    updateChart();
+  };
+
+  // 実績勉強時間更新
+  function updateStudyTime(id, time) {
+    tasks = tasks.map(t => (t.id === id ? { ...t, studyTime: time } : t));
+    saveTasks();
+    renderTasks();
+    updateChart();
+  }
+
+  // Chart.jsグラフ初期化
+  const ctx = document.getElementById('studyChart').getContext('2d');
+  const studyChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: [], // 日付ラベル
+      datasets: [{
+        label: '勉強時間(分)',
+        data: [],
+        backgroundColor: 'rgba(37, 99, 235, 0.7)'
+      }]
+    },
+    options: {
+      scales: {
+        x: { title: { display: true, text: '日付' } },
+        y: { title: { display: true, text: '分' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // 日ごとの勉強時間集計
+  function updateChart() {
+    // 今回は簡単に今日の合計勉強時間を表示（日付のラベルは固定で7日間表示のサンプル化も可能）
+    const today = new Date().toISOString().slice(0, 10);
+    const totalToday = tasks
+      .filter(t => t.done && t.studyTime > 0)
+      .reduce((sum, t) => sum + t.studyTime, 0);
+
+    studyChart.data.labels = [today];
+    studyChart.data.datasets[0].data = [totalToday];
+    studyChart.update();
+  }
+
+  // 初期描画
+  renderGoals();
   renderTasks();
-}
-
-function toggleDone(index) {
-  tasks[index].done = !tasks[index].done;
-  saveTasks();
-  renderTasks();
-}
-
-renderTasks();
+  updateChart();
 </script>
+
 </body>
 </html>
