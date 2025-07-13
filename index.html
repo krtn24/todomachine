@@ -40,11 +40,13 @@
   </section>
 
   <!-- グラフ表示 -->
-  <section>
-    <h2 class="text-xl font-semibold mb-3">今週の勉強時間推移（日曜〜土曜）</h2>
-    <canvas id="studyChart" class="w-full max-w-3xl mx-auto"></canvas>
-  </section>
-</div>
+<section>
+  <h2 class="text-xl font-semibold mb-3">今週の勉強時間推移（日曜〜土曜）</h2>
+  <div class="w-full max-w-xl mx-auto">
+    <canvas id="studyChart" style="height: 200px;"></canvas>
+  </div>
+</section>
+
 
 <script>
   const GOAL_KEY = 'qol_goals';
