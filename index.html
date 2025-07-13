@@ -6,11 +6,29 @@
 <title>タスク管理くん</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.2/dist/tailwind.min.css" rel="stylesheet" />
+<style>
+  /* 名言表示エリアのデザイン */
+  #quote {
+    font-style: italic;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: #2563eb;
+  }
+</style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4">
 
 <div class="max-w-4xl mx-auto bg-white rounded shadow p-6">
   <h1 class="text-3xl font-bold mb-6 text-center">タスク管理くん</h1>
+
+  <!-- モチベーションコラム -->
+  <section id="motivation" class="mb-6">
+    <div id="quote">読み込み中...</div>
+    <button id="newQuoteBtn" class="block mx-auto bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
+      名言を変える
+    </button>
+  </section>
 
   <!-- 目標設定 -->
   <section class="mb-8">
@@ -41,21 +59,18 @@
 
   <!-- グラフ表示 -->
   <section>
-    <h2 class="text-xl font-semibold mb-3">時間の推移</h2>
+    <h2 class="text-xl font-semibold mb-3">今週の勉強時間推移（日曜〜土曜）</h2>
     <canvas id="studyChart" class="w-full max-w-3xl mx-auto"></canvas>
   </section>
 </div>
 
 <script>
-  // ローカルストレージキー
   const GOAL_KEY = 'qol_goals';
   const TASK_KEY = 'qol_tasks';
 
-  // 状態保持
   let goals = JSON.parse(localStorage.getItem(GOAL_KEY) || '[]');
   let tasks = JSON.parse(localStorage.getItem(TASK_KEY) || '[]');
 
-  // 要素取得
   const goalForm = document.getElementById('goalForm');
   const goalList = document.getElementById('goalList');
   const goalTitle = document.getElementById('goalTitle');
@@ -67,7 +82,24 @@
   const taskDeadline = document.getElementById('taskDeadline');
   const taskEstTime = document.getElementById('taskEstTime');
 
-  // 目標追加
+  // 名言リスト（例）
+  const quotes = [
+    "成功の秘訣は、準備と機会が出会うところにある。 - ボビー・アンサー",
+    "小さなことを重ねることが、とんでもないところに行くただ一つの道だ。 - イチロー",
+    "努力は必ず報われる。もし報われない努力があるのならば、それはまだ努力と呼べない。 - 王貞治",
+    "夢を見ることができれば、それを実現することもできる。 - ウォルト・ディズニー",
+    "失敗は成功のもと。何度でも立ち上がろう。 - トーマス・エジソン"
+  ];
+
+  // 名言表示更新
+  const quoteElem = document.getElementById('quote');
+  const newQuoteBtn = document.getElementById('newQuoteBtn');
+  function showRandomQuote() {
+    const idx = Math.floor(Math.random() * quotes.length);
+    quoteElem.textContent = quotes[idx];
+  }
+  newQuoteBtn.onclick = showRandomQuote;
+
   goalForm.addEventListener('submit', e => {
     e.preventDefault();
     goals.push({
@@ -81,7 +113,6 @@
     goalForm.reset();
   });
 
-  // タスク追加
   taskForm.addEventListener('submit', e => {
     e.preventDefault();
     tasks.push({
@@ -90,14 +121,14 @@
       deadline: taskDeadline.value,
       estTime: Number(taskEstTime.value) || 0,
       done: false,
-      studyTime: 0 // 実績時間（分）
+      studyTime: 0
     });
     saveTasks();
     renderTasks();
+    updateGoalAchievedPercent(); // 達成度計算
     taskForm.reset();
   });
 
-  // 保存
   function saveGoals() {
     localStorage.setItem(GOAL_KEY, JSON.stringify(goals));
   }
@@ -105,15 +136,14 @@
     localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
   }
 
-  // 目標リスト描画
   function renderGoals() {
     goalList.innerHTML = '';
     goals.forEach(g => {
       const li = document.createElement('li');
-      li.className = 'border rounded p-2 flex justify-between items-center bg-gray-50';
+      li.className = 'border rounded p-2 flex flex-col sm:flex-row justify-between items-center bg-gray-50 gap-2';
 
       const info = document.createElement('div');
-      info.innerHTML = `<strong>${g.title}</strong> 期限: ${g.deadline} 達成度: ${g.achievedPercent}%`;
+      info.innerHTML = `<strong>${g.title}</strong> 期限: ${g.deadline} 達成度: ${g.achievedPercent.toFixed(1)}%`;
 
       const delBtn = document.createElement('button');
       delBtn.textContent = '削除';
@@ -130,24 +160,23 @@
     });
   }
 
-  // タスクリスト描画
   function renderTasks() {
     taskList.innerHTML = '';
     tasks.forEach(t => {
       const li = document.createElement('li');
       li.className =
-        'border rounded p-2 flex justify-between items-center ' + (t.done ? 'bg-green-100 line-through text-gray-600' : 'bg-white');
+        'border rounded p-2 flex flex-col sm:flex-row justify-between items-center gap-2 ' +
+        (t.done ? 'bg-green-100 line-through text-gray-600' : 'bg-white');
 
       const leftDiv = document.createElement('div');
-      leftDiv.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleDone(${t.id})" class="mr-2" />` +
-        `<strong>${t.title}</strong> 期限: ${t.deadline} 予定時間: ${t.estTime}分 実績時間: ${t.studyTime}分`;
+      leftDiv.innerHTML = `<label><input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleDone(${t.id})" class="mr-2" />` +
+        `<strong>${t.title}</strong> 期限: ${t.deadline} 予定時間: ${t.estTime}分 実績時間: </label>`;
 
-      // 勉強時間入力フォーム
       const studyTimeInput = document.createElement('input');
       studyTimeInput.type = 'number';
       studyTimeInput.min = 0;
       studyTimeInput.value = t.studyTime;
-      studyTimeInput.className = 'w-20 border rounded p-1 ml-4';
+      studyTimeInput.className = 'w-20 border rounded p-1 ml-2';
       studyTimeInput.onchange = e => {
         const time = Number(e.target.value);
         if (time >= 0) {
@@ -159,11 +188,12 @@
 
       const delBtn = document.createElement('button');
       delBtn.textContent = '削除';
-      delBtn.className = 'text-red-600 hover:underline ml-4';
+      delBtn.className = 'text-red-600 hover:underline ml-2';
       delBtn.onclick = () => {
         tasks = tasks.filter(task => task.id !== t.id);
         saveTasks();
         renderTasks();
+        updateGoalAchievedPercent();
         updateChart();
       };
 
@@ -173,28 +203,62 @@
     });
   }
 
-  // 完了チェック切り替え
   window.toggleDone = function (id) {
     tasks = tasks.map(t => (t.id === id ? { ...t, done: !t.done } : t));
     saveTasks();
     renderTasks();
+    updateGoalAchievedPercent();
     updateChart();
   };
 
-  // 実績勉強時間更新
   function updateStudyTime(id, time) {
     tasks = tasks.map(t => (t.id === id ? { ...t, studyTime: time } : t));
     saveTasks();
     renderTasks();
+    updateGoalAchievedPercent();
     updateChart();
   }
 
-  // Chart.jsグラフ初期化
+  // 達成度自動計算：目標タイトルと部分一致するタスクの完了率（完了タスク数/全タスク数*100）を計算
+  function updateGoalAchievedPercent() {
+    goals = goals.map(goal => {
+      const relatedTasks = tasks.filter(t =>
+        t.title.includes(goal.title)
+      );
+      if (relatedTasks.length === 0) {
+        return { ...goal, achievedPercent: 0 };
+      }
+      const doneCount = relatedTasks.filter(t => t.done).length;
+      const percent = (doneCount / relatedTasks.length) * 100;
+      return { ...goal, achievedPercent: percent };
+    });
+    saveGoals();
+    renderGoals();
+  }
+
+  // 週の日付（日曜〜土曜）を取得
+  function getWeekDates(date) {
+    const day = date.getDay();
+    const sunday = new Date(date);
+    sunday.setDate(date.getDate() - day);
+    let dates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }
+
+  function formatDate(date) {
+    return date.toISOString().slice(0, 10);
+  }
+
   const ctx = document.getElementById('studyChart').getContext('2d');
   const studyChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: [], // 日付ラベル
+      labels: [],
       datasets: [{
         label: '勉強時間(分)',
         data: [],
@@ -203,28 +267,40 @@
     },
     options: {
       scales: {
-        x: { title: { display: true, text: '日付' } },
+        x: { title: { display: true, text: '曜日' } },
         y: { title: { display: true, text: '分' }, beginAtZero: true }
+      },
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
       }
     }
   });
 
-  // 日ごとの勉強時間集計
   function updateChart() {
-    // 今回は簡単に今日の合計勉強時間を表示（日付のラベルは固定で7日間表示のサンプル化も可能）
-    const today = new Date().toISOString().slice(0, 10);
-    const totalToday = tasks
-      .filter(t => t.done && t.studyTime > 0)
-      .reduce((sum, t) => sum + t.studyTime, 0);
+    const today = new Date();
+    const weekDates = getWeekDates(today);
 
-    studyChart.data.labels = [today];
-    studyChart.data.datasets[0].data = [totalToday];
+    const labels = ['日', '月', '火', '水', '木', '金', '土'];
+
+    let times = weekDates.map(date => {
+      const dayStr = formatDate(date);
+      return tasks
+        .filter(t => t.done && t.deadline === dayStr)
+        .reduce((sum, t) => sum + t.studyTime, 0);
+    });
+
+    studyChart.data.labels = labels;
+    studyChart.data.datasets[0].data = times;
     studyChart.update();
   }
 
-  // 初期描画
+  // 初期表示
+  showRandomQuote();
   renderGoals();
   renderTasks();
+  updateGoalAchievedPercent();
   updateChart();
 </script>
 
